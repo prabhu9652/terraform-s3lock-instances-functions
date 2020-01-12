@@ -53,17 +53,6 @@ resource "aws_subnet" "subnet3-public" {
 
  
 
-resource "aws_subnet" "subnet4-public" {
-    vpc_id = "${aws_vpc.default.id}"
-    cidr_block = "10.1.4.0/24"
-    availability_zone = "us-east-1d"
-
-    tags = {
-        Name = "subnet-4"
-    }
-
-}
-
 resource "aws_route_table" "terraform-public" {
     vpc_id = "${aws_vpc.default.id}"
 
@@ -104,7 +93,9 @@ resource "aws_security_group" "allow_all" {
 
 terraform {
  backend "s3"{
-     bucket = "terraforms3bucket28"
+     encrypt = true
+     bucket = "terraform-remote-state-storage-s3"
+     bucket = "terraforms3bucket0328"
      key = "myterraform.tfstate"
      region = "us-east-1"
      
