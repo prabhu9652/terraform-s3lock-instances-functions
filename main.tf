@@ -94,7 +94,7 @@ resource "aws_security_group" "allow_all" {
 terraform {
  backend "s3"{
      encrypt = true
-     bucket = "terraform-remote-state-storage-s3"
+     dynamodb_table = "terraform-state-lock-dynamo"
      bucket = "terraforms3bucket0328"
      key = "myterraform.tfstate"
      region = "us-east-1"
