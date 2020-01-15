@@ -1,7 +1,7 @@
 #This Terraform Code Deploys Basic VPC Infra.
 provider "aws" {
-#    access_key = "${var.aws_access_key}"
- #   secret_key = "${var.aws_secret_key}"
+    access_key = "${var.aws_access_key}"
+    secret_key = "${var.aws_secret_key}"
     region = "${var.aws_region}"
 }
 
@@ -13,6 +13,10 @@ resource "aws_vpc" "default" {
     }
 }
 
+locals {
+     name = "${var.aws_region}-${var.vpc_name}"
+}
+
 resource "aws_internet_gateway" "default" {
     vpc_id = "${aws_vpc.default.id}"
 	tags = {
@@ -20,38 +24,17 @@ resource "aws_internet_gateway" "default" {
     }
 }
 
-resource "aws_subnet" "subnet1-public" {
+resource "aws_subnet" "subnets" {
+    count = "${length(var.cidrs)}"
     vpc_id = "${aws_vpc.default.id}"
-    cidr_block = "${var.public_subnet1_cidr}"
-    availability_zone = "us-east-1a"
+    cidr_block = "${element(var.cidrs, count.index)}"
+    availability_zone = "${element(var.azs, count.index)}"
 
     tags = {
-        Name = "${var.public_subnet1_name}"
+        Name = "Terraform-Subnet-${local.name}-${count.index}"
     }
 }
 
-resource "aws_subnet" "subnet2-public" {
-    vpc_id = "${aws_vpc.default.id}"
-    cidr_block = "${var.public_subnet2_cidr}"
-    availability_zone = "us-east-1b"
-
-    tags = {
-        Name = "${var.public_subnet2_name}"
-    }
-}
-
-resource "aws_subnet" "subnet3-public" {
-    vpc_id = "${aws_vpc.default.id}"
-    cidr_block = "${var.public_subnet3_cidr}"
-    availability_zone = "us-east-1c"
-
-    tags = {
-        Name = "${var.public_subnet3_name}"
-    }
-	
-}
-
- 
 
 resource "aws_route_table" "terraform-public" {
     vpc_id = "${aws_vpc.default.id}"
@@ -67,7 +50,8 @@ resource "aws_route_table" "terraform-public" {
 }
 
 resource "aws_route_table_association" "terraform-public" {
-    subnet_id = "${aws_subnet.subnet1-public.id}"
+    count = "${length(var.cidrs)}"
+    subnet_id = "${element(aws_subnet.subnets.*.id, count.index)}"
     route_table_id = "${aws_route_table.terraform-public.id}"
 }
 
@@ -91,47 +75,24 @@ resource "aws_security_group" "allow_all" {
     }
 }
 
-terraform {
- backend "s3"{
-     encrypt = true
-     dynamodb_table = "terraform-state-lock-dynamo"
-     bucket = "terraforms3bucket0328"
-     key = "myterraform.tfstate"
-     region = "us-east-1"
-     
- }   
+#ata "aws_ami" "my_ami" {
+#    most_recent      = true
+#    #name_regex       = "^mavrick"
+#    owners           = ["721834156908"]
+#
+resource "aws_instance" "web-1" {
+    count = "${var.env == "prod" ? 3:1}"
+    ami = "${lookup(var.amis, var.aws_region)}"
+    availability_zone = "${element(var.azs , count.index)}"
+    instance_type = "t2.micro"
+    key_name = "laptop-key-pair"
+    subnet_id = "${element(aws_subnet.subnets.*.id, count.index)}"
+    vpc_security_group_ids = ["${aws_security_group.allow_all.id}"]
+    associate_public_ip_address = true	
+    tags = {
+       Name = "Server-${local.name}-${count.index}"
+       Env ="prod${local.name}"
+       Owner ="prabhu${local.name}"
+   }
 }
 
-#data "aws_ami" "my_ami" {
-#     most_recent      = true
-#     #name_regex       = "^mavrick"
-#     owners           = ["721834156908"]
-#}
-
-
-#resource "aws_instance" "web-1" {
-#    ami = "${data.aws_ami.my_ami.id}"
-#    #ami = "ami-0d857ff0f5fc4e03b"
-#    availability_zone = "us-east-1a"
-#    instance_type = "t2.micro"
-#    key_name = "LaptopKey"
-#    subnet_id = "${aws_subnet.subnet1-public.id}"
-#    vpc_security_group_ids = ["${aws_security_group.allow_all.id}"]
-#    associate_public_ip_address = true	
-#    tags = {
-    #    Name = "Server-1"
-    #    Env = "Prod"
-    #    Owner = "Sree"
-    #}
-#}
-
-#output "ami_id" {
-#  value = "${data.aws_ami.my_ami.id}"
-#}
-#!/bin/bash
-# echo "Listing the files in the repo."
-# ls -al
-# echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++"
-# packer build -var 'aws_access_key=XXXXXXXXXXXXX' -var 'aws_secret_key=YYYYYYYYYYYYYYYYYYYY' packer.json
-# echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++"
-# terraform apply --var-file test.tfvars -var="aws_access_key=XXXXXXXXXXXXX" -var='aws_secret_key=YYYYYYYYYYYYYYYYYYYY' --auto-approve
